@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyclone Impact Forecaster</title>
+<meta name="description" content="Six-hour cyclone intensity forecast and relative district exposure ranking for the North Indian Ocean, on a 3D satellite globe.">
+<meta name="theme-color" content="#0f4c5c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f4c5c'/%3E%3Cpath d='M16 7a9 9 0 1 0 9 9M16 12a4 4 0 1 0 4 4' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<style>
+:root{
+  --paper:#f2ede3;--panel:#faf7f0;--ink:#17262b;--mute:#5b6b70;--rule:#ddd6c6;--teal:#0f4c5c;--teal-2:#0b3a47;--sig:#c8431f;--warn:#8a5a00;
+  --tint:rgba(15,76,92,.10);--tint-2:rgba(15,76,92,.06);
+  --serif:"Newsreader","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.22,1,.36,1);--z-overlay:1000}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;height:100dvh;display:grid;grid-template-columns:clamp(340px,28vw,420px) 1fr;background:var(--paper);color:var(--ink);font:14.5px/1.5 var(--sans);-webkit-font-smoothing:antialiased;counter-reset:sec}
+.skip{position:absolute;left:12px;top:-48px;background:var(--teal);color:#fff;padding:8px 12px;border-radius:6px;z-index:2000;transition:top .2s var(--ease)}
+.skip:focus{top:12px}
+aside{overflow-y:auto;background:var(--panel);border-right:1px solid var(--rule);padding:26px 24px 32px;box-shadow:2px 0 24px -12px var(--tint)}
+.mapwrap{position:relative;min-height:320px}
+#map{position:absolute;inset:0;background:radial-gradient(1.2px 1.2px at 12% 18%,#fffb,transparent),radial-gradient(1px 1px at 78% 12%,#fff9,transparent),radial-gradient(1.4px 1.4px at 64% 84%,#fffb,transparent),radial-gradient(1px 1px at 28% 74%,#fff8,transparent),radial-gradient(1px 1px at 91% 55%,#fff9,transparent),radial-gradient(1px 1px at 5% 52%,#fff8,transparent),radial-gradient(1px 1px at 44% 8%,#fff8,transparent),radial-gradient(120% 90% at 50% 40%,#0b1c2b,#03060b)}
+.maplibregl-canvas{outline:0}
+h1{font:600 28px/1.05 var(--serif);letter-spacing:-.02em;margin:0 0 12px;text-wrap:balance}
+h2{display:flex;align-items:baseline;gap:10px;font:600 13.5px/1.2 var(--sans);letter-spacing:-.005em;margin:30px 0 12px;counter-increment:sec}
+h2::before{content:counter(sec,decimal-leading-zero);font:500 11px var(--mono);color:var(--sig);letter-spacing:.04em}
+.pill{display:inline-flex;align-items:center;gap:7px;font:500 11.5px var(--mono);padding:4px 10px 4px 8px;border-radius:6px;background:var(--tint-2);color:var(--mute)}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.warn{color:var(--warn);background:rgba(138,90,0,.1)}
+.pill.ok{color:var(--teal)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
+label{display:block;font:500 12px var(--sans);color:var(--mute)}
+select,input{width:100%;margin-top:4px;padding:8px 10px;font:500 13.5px var(--mono);font-variant-numeric:tabular-nums;border:1px solid var(--rule);border-radius:6px;background:#fff;color:var(--ink);transition:border-color .2s,box-shadow .2s}
+select:hover,input:hover{border-color:#b9b19d}
+input[aria-invalid=true]{border-color:var(--sig);box-shadow:0 0 0 3px rgba(200,67,31,.12)}
+input[type=range]{padding:0;accent-color:var(--teal);margin-top:8px;border:0;background:none}
+button{font:600 14px var(--sans);border-radius:8px;cursor:pointer;transition:transform .15s var(--ease),background .2s,box-shadow .2s,border-color .2s}
+button:active:not(:disabled){transform:scale(.98) translateY(1px)}
+:focus-visible{outline:2px solid var(--sig);outline-offset:2px}
+#go{width:100%;margin-top:18px;padding:12px 14px;background:var(--teal);color:#fff;border:0;box-shadow:0 8px 18px -8px rgba(15,76,92,.6)}
+#go:hover:not(:disabled){background:var(--teal-2);box-shadow:0 10px 22px -8px rgba(15,76,92,.7)}
+#go:disabled{opacity:.6;cursor:progress}
+.note{font-size:12px;color:var(--mute);margin:10px 0 0;max-width:62ch;text-wrap:pretty}
+#err{margin-top:12px;font-size:13px;color:#8f2f12;background:rgba(200,67,31,.08);border-left:3px solid var(--sig);padding:8px 10px;border-radius:0 6px 6px 0}
+#err:empty{display:none}
+/* live */
+#live{display:grid;gap:8px}
+#live button.st{display:grid;grid-template-columns:1fr auto;gap:3px 10px;width:100%;text-align:left;background:#fff;color:var(--ink);border:1px solid var(--rule);padding:10px 12px}
+#live button.st:hover:not(:disabled){border-color:var(--teal);background:#fff;box-shadow:0 6px 16px -10px var(--tint)}
+#live button.st:disabled{opacity:.6;cursor:not-allowed}
+#live button.st .n{font:600 14px var(--mono);font-variant-numeric:tabular-nums}
+#live button.st small{grid-column:1/-1;color:var(--mute);font:400 11.5px var(--mono)}
+#live .note{margin:0}
+/* results */
+#empty{border:1px dashed var(--rule);border-radius:10px;padding:18px;background:var(--tint-2);margin-top:26px}
+#empty b{display:block;font:600 15px var(--serif);margin-bottom:4px}
+#empty p{margin:0;color:var(--mute);font-size:13px;max-width:40ch;text-wrap:pretty}
+#skel{margin-top:26px}
+.sk{height:14px;border-radius:4px;margin:12px 0;background:linear-gradient(90deg,var(--rule),#ece6d8,var(--rule));background-size:200% 100%;animation:sh 1.3s linear infinite}
+.sk.big{height:40px;width:45%}.sk.m{width:70%}
+@keyframes sh{to{background-position:-200% 0}}
+#res.busy #out{opacity:.45;transition:opacity .2s}
+.big{font:600 52px/1 var(--serif);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big small{font:500 14px var(--mono);color:var(--mute);letter-spacing:0}
+.trend{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font:500 12.5px var(--mono);color:var(--mute)}
+.cat{font:600 11.5px var(--sans);color:#fff;background:var(--sig);padding:3px 8px;border-radius:3px}
+ol{list-style:none;margin:0;padding:0}
+li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:11px 10px;margin:0 -10px;border-radius:8px;cursor:pointer;transition:background .2s;animation:rise .45s var(--ease) both;animation-delay:var(--d,0ms)}
+li+li{box-shadow:0 -1px 0 var(--rule)}
+li:hover,li:focus-visible{background:var(--tint-2)}
+li b{font-weight:600}
+li span{color:var(--mute);font-size:12px}
+li .n{font:600 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);text-align:right}
+li .r{font:400 11.5px var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.bar{grid-column:1/-1;height:3px;background:var(--rule);border-radius:2px;margin-top:5px}
+.bar i{display:block;height:100%;background:var(--sig);border-radius:2px;transition:width .5s var(--ease)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+details{margin-top:30px;font:12px/1.55 var(--mono);color:var(--mute);border-top:1px solid var(--rule);padding-top:14px}
+summary{cursor:pointer;font:600 13px var(--sans);color:var(--ink)}
+details p{max-width:62ch}
+/* map overlays */
+.legend,#toast{position:absolute;z-index:var(--z-overlay);background:rgba(250,247,240,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.6) inset,0 10px 30px -12px rgba(15,76,92,.45);font:12px/1.4 var(--sans);color:var(--mute)}
+.legend{left:12px;bottom:30px;padding:10px 12px;max-width:260px;display:grid;gap:6px}
+.legend i{display:inline-block;vertical-align:middle;margin-right:8px}
+.k1{width:12px;height:12px;border-radius:50%;background:rgba(200,67,31,.45);border:1.5px solid var(--teal)}
+.k2{width:14px;height:10px;border:1.5px dashed var(--teal);border-radius:2px}
+#toast{top:14px;left:50%;padding:9px 14px;color:var(--ink);font-weight:500;transform:translate(-50%,-12px);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s var(--ease)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.eye{width:var(--s,64px);height:var(--s,64px);filter:drop-shadow(0 0 14px rgba(255,255,255,.6));cursor:grab;transition:width .4s var(--ease),height .4s var(--ease)}
+.eye:active{cursor:grabbing}.eye svg{width:100%;height:100%;overflow:visible}
+.eye .spin{transform-box:fill-box;transform-origin:center;animation:spin 14s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tools{position:absolute;z-index:var(--z-overlay);top:12px;left:12px;display:flex;gap:6px}
+.tools button{font:500 12px var(--mono);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(8,18,26,.62);color:#dfeef2;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.tools button:hover{border-color:#9fe4ee}.tools button[aria-pressed=true]{background:rgba(15,76,92,.88);border-color:#9fe4ee}
+.tip .maplibregl-popup-content{font:500 12px var(--sans);color:var(--ink);background:var(--panel);border-radius:6px;padding:6px 10px;box-shadow:0 6px 16px -6px rgba(0,0,0,.6)}
+.tip.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--panel)}
+.maplibregl-ctrl-attrib{font-size:10px}
+/* scroll-driven reveal (progressive) */
+@supports(animation-timeline:view()){aside section{animation:reveal linear both;animation-timeline:view();animation-range:entry 0% entry 40%}@keyframes reveal{from{opacity:.2;transform:translateY(20px)}}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+@media(max-width:800px){body{grid-template-columns:1fr;grid-template-rows:auto auto;height:auto}.mapwrap{order:-1;position:sticky;top:0;height:46dvh;z-index:5}aside{overflow:visible;border:0;box-shadow:none}.legend{display:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#map">Skip to map</a>
+<aside>
+  <header>
+    <h1>Cyclone impact forecaster</h1>
+    <span id="pill" class="pill">checking models…</span>
+  </header>
+
+  <section data-cam="live">
+    <h2>Live storms · North Indian Ocean</h2>
+    <div id="live" aria-live="polite"><p class="note">Checking feed…</p></div>
+  </section>
+
+  <section data-cam="replay">
+    <h2>Replay a real storm</h2>
+    <label>Storm (IBTrACS)<select id="storm"><option value="">Enter manually</option></select></label>
+    <label style="margin-top:12px">Time step <span id="tlabel"></span><input id="step" type="range" min="0" max="0" value="0"></label>
+    <p class="note">Replayed storms are in the training data. Held-out accuracy is in the model card.</p>
+  </section>
+
+  <section data-cam="state">
+    <h2>Storm state · click the map to place</h2>
+    <div class="grid">
+      <label>Lat °N<input id="lat" type="number" step="0.1" value="15.5"></label>
+      <label>Lon °E<input id="lon" type="number" step="0.1" value="87.5"></label>
+      <label>Wind (kt)<input id="wind" type="number" value="80"></label>
+      <label>Pressure (hPa)<input id="pressure" type="number" value="970"></label>
+      <label>Wind Δ / 6h<input id="wind_trend" type="number" value="10"></label>
+      <label>Pressure Δ / 6h<input id="pressure_trend" type="number" value="-8"></label>
+      <label>Impact radius (km)<input id="radius_km" type="number" min="1" max="1500" value="400"></label>
+    </div>
+    <button id="go" type="button">Forecast impact</button>
+    <div id="err" role="alert"></div>
+  </section>
+
+  <section id="res" aria-live="polite" data-cam="impact">
+    <div id="empty"><b>No forecast yet</b><p>Pick a live or replayed storm, or click the map inside the dashed box, then run the forecast.</p></div>
+    <div id="skel" hidden><div class="sk big"></div><div class="sk m"></div><div class="sk"></div><div class="sk"></div><div class="sk m"></div></div>
+    <div id="out" hidden>
+      <h2>Next 6h intensity</h2>
+      <div class="big"><span id="nw"></span> <small>kt</small></div>
+      <div class="trend"><span id="dw"></span><span id="cat" class="cat"></span></div>
+      <h2>People affected if the district is in the impact zone</h2>
+      <ol id="rank"></ol>
+      <p class="note" id="rnote"></p>
+    </div>
+  </section>
+
+  <details id="card"><summary>Model card &amp; data</summary><div id="cardbody"></div></details>
+</aside>
+
+<main class="mapwrap">
+  <div id="map" role="application" aria-label="3D satellite globe of the North Indian Ocean"></div>
+  <div id="toast" role="status"></div>
+  <div class="tools"><button type="button" data-l="nasa" aria-pressed="false" title="NASA MODIS true-colour, previous UTC day">NASA · yesterday</button><button type="button" data-l="lbl" aria-pressed="true">Labels</button></div>
+  <div class="legend"><span><i class="k1"></i>Circle size = expected people affected</span><span><i class="k2"></i>Dashed box = model coverage</span></div>
+</main>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script>
+const $=id=>document.getElementById(id), num=id=>+$(id).value;
+const FIELDS=['lat','lon','wind','pressure','wind_trend','pressure_trend'];
+const RANGE={lat:[0,35,'Latitude'],lon:[55,100,'Longitude'],wind:[0,200,'Wind'],pressure:[850,1050,'Pressure'],radius_km:[1,1500,'Impact radius']};
+const sig2=n=>+n.toPrecision(2), fmt=n=>sig2(n).toLocaleString('en-IN');
+const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const inBox=(lat,lon)=>lat>=RANGE.lat[0]&&lat<=RANGE.lat[1]&&lon>=RANGE.lon[0]&&lon<=RANGE.lon[1];
+
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const day=new Date(Date.now()-864e5).toISOString().slice(0,10); // NASA GIBS: last complete UTC day
+const ras=(t,a,m)=>({type:'raster',tiles:[t],tileSize:256,maxzoom:m,attribution:a});
+const esri='https://server.arcgisonline.com/ArcGIS/rest/services/';
+const map=new maplibregl.Map({container:'map',center:[25,22],zoom:1.1,maxPitch:75,attributionControl:{compact:true},
+  style:{version:8,projection:{type:'globe'},
+    sources:{
+      sat:ras(esri+'World_Imagery/MapServer/tile/{z}/{y}/{x}','Imagery © Esri, Maxar, Earthstar Geographics',17),
+      nasa:ras(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${day}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,'NASA GIBS MODIS Terra '+day,9),
+      lbl:ras(esri+'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}','',13),
+      dem:{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:11,attribution:'Terrain © Mapzen / AWS'}},
+    layers:[{id:'sat',type:'raster',source:'sat'},{id:'nasa',type:'raster',source:'nasa',layout:{visibility:'none'}},{id:'lbl',type:'raster',source:'lbl'}],
+    terrain:{source:'dem',exaggeration:1.4},
+    sky:{'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,1,7,0]}}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
+const ready=new Promise(r=>map.on('load',r));
+const fc=f=>({type:'FeatureCollection',features:f});
+const draw=(id,d)=>ready.then(()=>map.getSource(id).setData(d));
+const line=p=>fc(p.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:p}}]:[]);
+const disc=(lat,lon,km)=>{const d=km/6371,la=lat*Math.PI/180,lo=lon*Math.PI/180,c=[];
+  for(let i=0;i<=64;i++){const b=i/64*2*Math.PI,a=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(b)),
+    o=lo+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(a));c.push([o*180/Math.PI,a*180/Math.PI])}
+  return {type:'Feature',geometry:{type:'Polygon',coordinates:[c]}}};
+const pop=new maplibregl.Popup({closeButton:false,closeOnClick:false,offset:14,className:'tip',anchor:'bottom'});
+ready.then(()=>{
+  const G=(id,d)=>map.addSource(id,{type:'geojson',data:d});
+  G('box',line([[55,0],[100,0],[100,35],[55,35],[55,0]]));G('zone',fc([]));G('trail',fc([]));G('dist',fc([]));
+  map.addLayer({id:'box',type:'line',source:'box',paint:{'line-color':'#9fe4ee','line-width':1.25,'line-dasharray':[3,5],'line-opacity':.85}});
+  map.addLayer({id:'zone-fill',type:'fill',source:'zone',paint:{'fill-color':'#ff5a2a','fill-opacity':.13}});
+  map.addLayer({id:'zone',type:'line',source:'zone',paint:{'line-color':'#ff8a5c','line-width':1.5,'line-dasharray':[2,2]}});
+  map.addLayer({id:'trail',type:'line',source:'trail',paint:{'line-color':'#ffb08f','line-width':2.5,'line-dasharray':[1.5,1.5]}});
+  const R=(a,b)=>['interpolate',['linear'],['get','k'],0,a,1,b];
+  map.addLayer({id:'dist',type:'circle',source:'dist',paint:{'circle-radius':['interpolate',['linear'],['zoom'],2,R(4,14),8,R(8,30)],'circle-color':'#ff5a2a','circle-opacity':.58,'circle-stroke-color':'#fff','circle-stroke-width':1.5,'circle-pitch-alignment':'map'}});
+  map.on('mousemove','dist',e=>{map.getCanvas().style.cursor='pointer';const f=e.features[0];pop.setLngLat(f.geometry.coordinates).setText(f.properties.tip).addTo(map)});
+  map.on('mouseleave','dist',()=>{map.getCanvas().style.cursor='';pop.remove()});
+});
+
+// storm marker = rotating cyclone, scaled by wind
+const eye=document.createElement('div');eye.className='eye';
+eye.innerHTML='<svg viewBox="-50 -50 100 100" aria-hidden="true"><defs><radialGradient id="cg"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".62" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><g class="spin"><circle r="48" fill="url(#cg)"/><g fill="none" stroke="#c8431f" stroke-width="3.5" stroke-linecap="round"><path d="M0 0C6-8 20-8 26 2S22 30-2 34-34 18-34-8-12-38 12-36 40-20 42 4"/><path d="M0 0C6-8 20-8 26 2S22 30-2 34-34 18-34-8-12-38 12-36 40-20 42 4" transform="rotate(180)"/></g></g><circle r="5" fill="#0b1b20" stroke="#fff" stroke-width="2"/></svg>';
+const storm=new maplibregl.Marker({element:eye,draggable:true}).setLngLat([num('lon'),num('lat')]).addTo(map);
+const sizeEye=()=>eye.style.setProperty('--s',Math.round(Math.min(120,Math.max(44,40+(num('wind')||0)*.6)))+'px');
+const drawZone=()=>{const p=storm.getLngLat(),r=num('radius_km')||400;draw('zone',fc(r>0&&r<=1500?[disc(p.lat,p.lng,r)]:[]))};
+const drawTrail=p=>draw('trail',line(p.map(([a,b])=>[b,a])));
+let ACTUAL=null, LIVE=[], STORMS=[], DIST=[], BOUNDS=null, SEQ=0, lastValid={lat:num('lat'),lng:num('lon')}, toastT;
+sizeEye();drawZone();
+
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2800)}
+const OUT_MSG='Outside model coverage (0–35°N, 55–100°E). Place the storm inside the dashed box.';
+
+const place=ll=>{
+  if(!inBox(ll.lat,ll.lng)){storm.setLngLat([lastValid.lng,lastValid.lat]);toast(OUT_MSG);return false}
+  ACTUAL=null;drawTrail([]);lastValid={lat:ll.lat,lng:ll.lng};storm.setLngLat([ll.lng,ll.lat]);
+  $('lat').value=ll.lat.toFixed(1);$('lon').value=ll.lng.toFixed(1);
+  ['lat','lon'].forEach(k=>$(k).removeAttribute('aria-invalid'));drawZone();return true};
+map.on('click',e=>{if(map.queryRenderedFeatures(e.point,{layers:['dist']}).length)return;place(e.lngLat.wrap())});
+storm.on('dragend',()=>place(storm.getLngLat().wrap()));
+['lat','lon'].forEach(k=>$(k).addEventListener('input',()=>{const a=num('lat'),b=num('lon');if(isFinite(a)&&isFinite(b)&&inBox(a,b)){storm.setLngLat([b,a]);lastValid={lat:a,lng:b};drawZone()}}));
+$('radius_km').addEventListener('input',drawZone);
+$('wind').addEventListener('input',sizeEye);
+document.querySelectorAll('.grid input').forEach(e=>e.addEventListener('input',()=>{ACTUAL=null;e.removeAttribute('aria-invalid')}));
+
+async function call(path,body){
+  const res=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);
+  const j=await res.json().catch(()=>({}));
+  if(res.status===422)throw Error('Input out of range (lat 0–35, lon 55–100, wind 0–200 kt, pressure 850–1050 hPa, radius 1–1500 km)');
+  if(!res.ok)throw Error(typeof j.detail==='string'?j.detail:'Server error '+res.status);
+  return j;
+}
+
+function validate(){
+  const bad=[];
+  Object.keys(RANGE).forEach(k=>{const v=$(k).value,n=+v,[lo,hi,name]=RANGE[k];
+    const ok=(k==='radius_km'&&v==='')||(v!==''&&isFinite(n)&&n>=lo&&n<=hi);
+    if(ok)$(k).removeAttribute('aria-invalid');else{$(k).setAttribute('aria-invalid','true');bad.push(`${name} must be ${lo}–${hi}`)}});
+  ['wind_trend','pressure_trend'].forEach(k=>{const ok=$(k).value!==''&&isFinite(num(k));if(ok)$(k).removeAttribute('aria-invalid');else{$(k).setAttribute('aria-invalid','true');bad.push('Trend values must be numbers')}});
+  return [...new Set(bad)];
+}
+function clearResults(){$('out').hidden=true;$('skel').hidden=true;$('empty').hidden=false;draw('dist',fc([]));DIST=[];BOUNDS=null}
+
+async function forecast(frame){
+  const b=$('go'), my=++SEQ; $('err').textContent='';
+  const bad=validate();
+  if(bad.length){clearResults();$('err').textContent=bad.join('. ')+'.';return}
+  b.disabled=true; $('res').classList.add('busy'); $('empty').hidden=true; if($('out').hidden)$('skel').hidden=false;
+  try{
+    const s=Object.fromEntries(FIELDS.map(k=>[k,num(k)])); s.radius_km=num('radius_km')||null;
+    const f=await call('/api/v1/forecast',s); if(my!==SEQ)return;
+    const i=f.intensity, d=f.districts, max=d[0]?.affected||1;
+    $('nw').textContent=i.next_wind_kt; $('cat').textContent=i.category;
+    $('dw').textContent=`${i.delta_kt>=0?'▲ +':'▼ '}${i.delta_kt} kt vs now`+(ACTUAL==null?'':` · actual next: ${ACTUAL} kt (error ${(i.next_wind_kt-ACTUAL).toFixed(1)})`);
+    DIST=d.map(r=>({lng:r.lon,lat:r.lat,tip:`${r.district}, ${r.state}: ~${fmt(r.affected)} affected`}));
+    draw('dist',fc(d.map((r,n)=>({type:'Feature',properties:{k:Math.sqrt(r.affected/max),tip:DIST[n].tip},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}))));
+    const sp=storm.getLngLat(); BOUNDS=d.length?d.reduce((bb,r)=>bb.extend([r.lon,r.lat]),new maplibregl.LngLatBounds([sp.lng,sp.lat],[sp.lng,sp.lat])):null;
+    drawZone(); sizeEye(); if(frame){const c=camFor('impact'); c&&map.easeTo({...c,duration:RM?0:2200})}
+    $('rank').replaceChildren(...(d.length?d.slice(0,8):[null]).map((r,idx)=>{
+      const li=el('li');
+      if(!r){li.textContent=`No district within ${f.radius_km} km of the storm.`;li.style.cursor='default';return li}
+      li.tabIndex=0; li.style.setProperty('--d',idx*45+'ms');
+      const nm=el('b',null,r.district+(r.density_capped?' †':'')), n=el('span','n',fmt(r.affected)), st=el('span',null,`${r.state} · ${Math.round(r.distance_km)} km`), rg=el('span','r',`${fmt(r.low)}–${fmt(r.high)}`);
+      const bar=el('div','bar'), fill=el('i'); fill.style.width=(100*r.affected/max)+'%'; bar.append(fill);
+      li.append(nm,n,st,rg,bar);
+      const go=()=>map.flyTo({center:[r.lon,r.lat],zoom:7,pitch:60,bearing:-15,speed:.8,essential:false}); li.onclick=go; li.onkeydown=e=>e.key==='Enter'&&go();
+      const show=()=>DIST[idx]&&pop.setLngLat([DIST[idx].lng,DIST[idx].lat]).setText(DIST[idx].tip).addTo(map), hide=()=>pop.remove();
+      li.onmouseenter=show; li.onmouseleave=hide; li.onfocus=show; li.onblur=hide; return li}));
+    $('rnote').textContent=`Top ${Math.min(8,d.length)} of ${f.districts_in_range} districts within ${f.radius_km} km (map shows top ${d.length}). Same predicted wind is applied to every district and there is no track or landfall forecast, so read this as a relative ranking of exposure, not a landfall prediction. † density capped at the training maximum. Never more than the district's Census 2011 population. Rounded to 2 significant digits; range is the 10–90% cross-validated error band.`;
+    $('skel').hidden=true; $('out').hidden=false;
+  }catch(e){ if(my===SEQ){clearResults();$('err').textContent=e.message} }
+  if(my===SEQ){b.disabled=false;$('res').classList.remove('busy')}
+}
+$('go').onclick=()=>forecast(true);
+
+function load(p,trailPts,radius){ // put a storm state into the form, draw its trail
+  FIELDS.forEach(k=>$(k).value=p[k]??0);
+  Object.keys(RANGE).forEach(k=>$(k).removeAttribute('aria-invalid'));
+  $('radius_km').value=radius?Math.max(150,Math.round(radius)):400;
+  lastValid={lat:p.lat,lng:p.lon}; storm.setLngLat([p.lon,p.lat]); drawTrail(trailPts||[]); drawZone(); sizeEye(); map.easeTo({center:[p.lon,p.lat],duration:RM?0:1200});
+}
+
+// ---- live feed
+function renderLive(j){
+  const rows=[];
+  if(!j.storms.length){
+    rows.push(el('p','note',j.error&&!j.fetched_at?'Live feed unavailable right now. Manual and replay modes still work.':'No active North Indian Ocean cyclone in the latest IBTrACS build.'));
+  }
+  j.storms.forEach(s=>{
+    const b=el('button','st'); b.type='button'; b.disabled=!s.forecastable;
+    b.append(el('b',null,s.name||'Unnamed'),el('span','n',`${s.wind} kt`),el('small',null,s.forecastable?`last fix ${s.time.replace('T',' ')} · ${s.age_h} h ago`:'needs two consecutive 6 h fixes to forecast'));
+    b.onclick=()=>{ACTUAL=null;load(s,s.track,s.r34_km);$('storm').value='';forecast(true)}; rows.push(b);
+  });
+  rows.push(el('p','note',(j.fetched_at?`Checked ${new Date(j.fetched_at).toLocaleTimeString()} · `:'')+(j.stale?'showing last good data, upstream currently failing · ':'')+'IBTrACS/JTWC provisional fixes, updated about 3× a week (near-real-time).'));
+  $('live').replaceChildren(...rows);
+}
+async function loadLive(){try{renderLive(await call('/api/v1/live'))}catch(e){$('live').replaceChildren(el('p','note','Live feed unreachable: '+e.message))}}
+loadLive(); setInterval(loadLive,10*60*1000);
+
+// ---- replay of real historical storms
+fetch('/storms.json').then(r=>r.ok?r.json():[]).then(x=>{STORMS=x;$('storm').insertAdjacentHTML('beforeend',x.map((v,i)=>`<option value="${i}">${v.label.replace(/[<&]/g,'')}</option>`).join(''))}).catch(()=>{});
+let t; const replay=()=>{const s=STORMS[$('storm').value];if(!s){ACTUAL=null;return}
+  $('step').max=s.steps.length-1;const k=+$('step').value,p=s.steps[k];
+  load(p,s.steps.slice(0,k+1).map(q=>[q.lat,q.lon]),p.r34_km);$('tlabel').textContent=p.t;ACTUAL=p.next_wind;
+  clearTimeout(t);t=setTimeout(forecast,250)};
+$('storm').onchange=()=>{$('step').value=0;replay()};$('step').oninput=replay;
+
+// ---- model card
+call('/api/v1/status').then(s=>{
+  const a=s.intensity,v=s.vulnerability,p=$('pill');
+  p.textContent='Real data · IBTrACS + EM-DAT + Census 2011';p.className='pill ok';
+  $('cardbody').replaceChildren(
+    el('p',null,`Intensity (storm-grouped ${a.cv_folds}-fold CV, ${a.n_storms} storms): MAE ${a.cv_mae} ± ${a.cv_std} kt vs ${a.baseline_mae} kt last-value baseline; better in ${Math.round(100*a.folds_won)}% of folds. Trained on IBTrACS through ${a.data_through.slice(0,10)}.`),
+    el('p',null,`Impact (5-fold × 20 CV, n=${v.n} EM-DAT events, log scale): MAE ${v.cv_mae_log} ± ${v.cv_std_log} vs ${v.baseline_mae_log} mean baseline; better in ${Math.round(100*v.folds_won)}% of folds; +10 kt ≈ ×${v.per_10kt_factor} affected. Small sample: modest gain, wide range.`),
+    el('p',null,`Exposure: ${s.districts} districts, Census 2011 population and area.`));
+}).catch(()=>{$('pill').textContent='API unreachable';$('pill').className='pill warn'});
+
+// ---- camera: orbit-to-basin descent on load, then scroll drives the camera
+const CAMS={live:{center:[80,14],zoom:3.4,pitch:35,bearing:0},replay:{center:[78,15],zoom:3.8,pitch:55,bearing:-20}};
+function camFor(k){
+  if(CAMS[k])return CAMS[k];
+  if(k==='state'){const c=storm.getLngLat();return{center:[c.lng,c.lat],zoom:5.4,pitch:62,bearing:12}}
+  if(k==='impact'&&BOUNDS)return{...map.cameraForBounds(BOUNDS,{padding:90,maxZoom:7}),pitch:50,bearing:-10};
+}
+ready.then(()=>{const c=camFor('live');RM?map.jumpTo(c):map.easeTo({...c,duration:6500,easing:t=>1-(1-t)**3})});
+let U=0; document.addEventListener('scroll',()=>U=1,{capture:true,passive:true}); // only real scrolling moves the camera
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(!e.isIntersecting||!U)return; const c=camFor(e.target.dataset.cam); c&&map.easeTo({...c,duration:RM?0:1800});
+}),{root:innerWidth>800?document.querySelector('aside'):null,rootMargin:'-30% 0px -60% 0px'});
+document.querySelectorAll('[data-cam]').forEach(x=>io.observe(x));
+
+// ---- layer toggles
+document.querySelectorAll('.tools button').forEach(b=>b.onclick=()=>{
+  const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on);
+  ready.then(()=>map.setLayoutProperty(b.dataset.l,'visibility',on?'visible':'none'))});
+</script>
+</body>
+</html>

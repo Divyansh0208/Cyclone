@@ -1,0 +1,15 @@
+# Python / env
+env/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+
+# raw datasets
+data/ibtracs*.csv
+data/*.xlsx
+
+# docs: only README.md is pushed
+*.md
+!README.md

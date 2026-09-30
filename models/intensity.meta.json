@@ -1,0 +1,22 @@
+{
+  "n_rows": 4555,
+  "n_storms": 319,
+  "cv_folds": 5,
+  "cv_mae": 3.04,
+  "cv_std": 0.2,
+  "baseline_mae": 3.49,
+  "folds_won": 1.0,
+  "target": "delta",
+  "features": [
+    "lat",
+    "lon",
+    "wind",
+    "pressure",
+    "wind_trend",
+    "pressure_trend"
+  ],
+  "source": "ibtracs.NI.csv",
+  "data_through": "2026-09-23 18:00:00",
+  "xgboost": "3.4.1",
+  "trained_at": "2026-09-29T20:16:16+00:00"
+}
