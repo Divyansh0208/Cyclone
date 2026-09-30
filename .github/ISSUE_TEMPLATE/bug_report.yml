@@ -1,0 +1,28 @@
+name: Bug report
+description: Something is broken or gives a wrong result
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: state
+    attributes:
+      label: Storm state (if a forecast is involved)
+      description: lat, lon, wind (kt), pressure (hPa), wind_trend, pressure_trend, radius_km
+      render: json
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options: [Live site, Local run, Docker]
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Browser / OS / Python version

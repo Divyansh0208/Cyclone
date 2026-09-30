@@ -6,10 +6,10 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 
-# raw datasets
+# raw datasets (licensed or large; not redistributed)
 data/ibtracs*.csv
 data/*.xlsx
+data/emdat_joined.csv
 
-# docs: only README.md is pushed
-*.md
-!README.md
+# internal notes
+PRD.md
